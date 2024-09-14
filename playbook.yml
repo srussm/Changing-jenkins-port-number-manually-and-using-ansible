@@ -1,0 +1,46 @@
+---
+- hosts: all
+remote_user: ec2-user
+become: yes
+vars:
+ports: 9393
+tasks:
+  - name: Download jenkins
+get_url:
+url: https://pkg.jenkins.io/redhat-stable/jenkins.repo
+dest: /etc/yum.repos.d/jenkins.repo
+
+  - name: jenkins key
+ansible.builtin.rpm_key:
+state: present
+key: https://pkg.jenkins.io/redhat-stable/jenkins.io.key
+
+  - name: Install java and jenkins
+yum:
+name: "{{ item }}"
+state: latest
+loop:
+      - java
+      - jenkins
+
+  - name: changing jenkins port no
+lineinfile:
+path: /usr/lib/systemd/system/jenkins.service
+regexp: '^Environment="JENKINS_PORT=8080"'
+line: Environment="JENKINS_PORT={{ports}}"
+notify: restart jenkins
+
+  - name: daemon-reload to pick up config changes
+ansible.builtin.systemd:
+daemon_reload: yes
+
+
+  - name: Start jenkins
+ansible.builtin.systemd:
+name: jenkins
+state: started
+handlers:
+  - name: restart jenkins
+service:
+name: jenkins
+state: restarted
